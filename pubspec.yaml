@@ -1,0 +1,33 @@
+name: knauf_calc
+description: "Калькулятор КНАУФ МП 75"
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  shared_preferences: ^2.2.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_launcher_icons: ^0.13.1
+  flutter_native_splash: ^2.3.10
+
+flutter:
+  uses-material-design: true
+  assets:
+    - app_icon.png
+
+# Конфигурация иконки приложения
+flutter_launcher_icons:
+  android: "launcher_icon"
+  ios: true
+  image_path: "app_icon.png"
+
+# Конфигурация сплэш-экрана (заставки)
+flutter_native_splash:
+  color: "#FFFFFF"
