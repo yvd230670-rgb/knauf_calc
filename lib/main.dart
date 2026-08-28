@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'beacon_calculator.dart';
 
 void main() {
   runApp(const KnaufApp());
@@ -138,112 +139,160 @@ class _CalcScreenState extends State<CalcScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('КНАУФ МП 75', style: TextStyle(fontWeight: FontWeight.bold)),
+        title: const Text('Калькулятор штукатура', style: TextStyle(fontWeight: FontWeight.bold)),
         centerTitle: true,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.cleaning_services),
-            tooltip: 'Очистить',
-            onPressed: () {
-              _wCtrl.clear();
-              _tCtrl.clear();
-            },
-          )
-        ],
+        // actions: убрали полностью
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
-            Card(
-              elevation: 3,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              color: const Color(0xFF212121),
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: TextField(
-                  controller: _hCtrl,
-                  style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  decoration: const InputDecoration(
-                    labelText: 'Высота помещения (м)',
-                    labelStyle: TextStyle(color: Colors.orangeAccent),
-                    suffixText: 'м',
-                    suffixStyle: TextStyle(color: Colors.white),
-                    border: OutlineInputBorder(),
-                    enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: Colors.orangeAccent)),
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _wCtrl,
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                    decoration: const InputDecoration(
-                      labelText: 'Ширина (м)',
-                      suffixText: 'м',
-                      border: OutlineInputBorder(),
-                      filled: true,
-                      fillColor: Colors.white,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: TextField(
-                    controller: _tCtrl,
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                    decoration: const InputDecoration(
-                      labelText: 'Толщина слоя (мм)',
-                      suffixText: 'мм',
-                      border: OutlineInputBorder(),
-                      filled: true,
-                      fillColor: Colors.white,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 24),
+            // ОБЩАЯ КАРТОЧКА (поля + результаты)
             Card(
               elevation: 4,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               child: Padding(
                 padding: const EdgeInsets.all(16),
                 child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    // ЗАГОЛОВОК + КНОПКА ОЧИСТКИ
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'КНАУФ МП 75',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFFFF5722),
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.cleaning_services),
+                          tooltip: 'Очистить',
+                          onPressed: () {
+                            _hCtrl.clear();
+                            _wCtrl.clear();
+                            _tCtrl.clear();
+                            setState(() {
+                              _area = 0;
+                              _weight = 0;
+                              _water = 0;
+                              _bags = 0;
+                            });
+                          },
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+
+                    // 1. Высота
+                    Card(
+                      elevation: 3,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      color: const Color(0xFF212121),
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: TextField(
+                          controller: _hCtrl,
+                          style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                          decoration: const InputDecoration(
+                            labelText: 'Высота помещения (м)',
+                            labelStyle: TextStyle(color: Colors.orangeAccent),
+                            suffixText: 'м',
+                            suffixStyle: TextStyle(color: Colors.white),
+                            border: OutlineInputBorder(),
+                            enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: Colors.orangeAccent)),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // 2. Ширина и Толщина
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: _wCtrl,
+                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                            decoration: const InputDecoration(
+                              labelText: 'Ширина (м)',
+                              suffixText: 'м',
+                              border: OutlineInputBorder(),
+                              filled: true,
+                              fillColor: Colors.white,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: TextField(
+                            controller: _tCtrl,
+                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                            decoration: const InputDecoration(
+                              labelText: 'Толщина слоя (мм)',
+                              suffixText: 'мм',
+                              border: OutlineInputBorder(),
+                              filled: true,
+                              fillColor: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 24),
+
+                    // 3.  РЕЗУЛЬТАТЫ (появляются только если площадь > 0)
+                    if (_area > 0) ...[
+                    const Divider(),
                     ListTile(
                       leading: const Icon(Icons.aspect_ratio, color: Color(0xFFFF5722)),
                       title: const Text('Площадь стен'),
-                      trailing: Text('${_area.toStringAsFixed(2)} м²', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                      trailing: Text(
+                        '${_area.toStringAsFixed(2)} м²',
+                        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                      ),
                     ),
                     const Divider(),
                     ListTile(
                       leading: const Icon(Icons.scale, color: Color(0xFFFF5722)),
                       title: const Text('Сухая смесь'),
-                      trailing: Text('${_weight.toStringAsFixed(1)} кг', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFFFF5722))),
+                      trailing: Text(
+                        '${_weight.toStringAsFixed(1)} кг',
+                        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFFFF5722)),
+                      ),
                     ),
                     const Divider(),
                     ListTile(
                       leading: const Icon(Icons.water_drop, color: Colors.blue),
                       title: const Text('Расход воды'),
-                      trailing: Text('${_water.toStringAsFixed(1)} л', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.blue)),
+                      trailing: Text(
+                        '${_water.toStringAsFixed(1)} л',
+                        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.blue),
+                      ),
                     ),
                     const Divider(),
                     ListTile(
                       leading: const Icon(Icons.inventory_2, color: Color(0xFF212121)),
                       title: const Text('Мешки (по 30 кг)'),
-                      trailing: Text('${_bags.toStringAsFixed(1)} шт.', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                      trailing: Text(
+                        '${_bags.toStringAsFixed(1)} шт.',
+                        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                      ),
                       subtitle: const Text('Точное значение (дробное)'),
                     ),
+                   ],
                   ],
                 ),
               ),
-            )
+            ),
+            const SizedBox(height: 24),
+
+            // МАЯКИ (отдельная карточка)
+            const BeaconCalculator(),
           ],
         ),
       ),
