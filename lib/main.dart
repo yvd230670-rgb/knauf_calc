@@ -1,6 +1,67 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'beacon_calculator.dart';
+import 'room_planner.dart';
+import 'dart:convert';  // для jsonEncode и jsonDecode
+import 'saved_rooms_screen.dart';
+
+// ========== СТРУКТУРЫ ДАННЫХ ДЛЯ КОМНАТ ==========
+
+class RoomData {
+  final String id;
+  final String name;
+  final List<WallData> walls;
+  final double totalLength;
+
+  RoomData({
+    required this.id,
+    required this.name,
+    required this.walls,
+    required this.totalLength,
+  });
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'name': name,
+    'walls': walls.map((w) => w.toJson()).toList(),
+    'totalLength': totalLength,
+  };
+
+  factory RoomData.fromJson(Map<String, dynamic> json) => RoomData(
+    id: json['id'],
+    name: json['name'],
+    walls: (json['walls'] as List).map((w) => WallData.fromJson(w)).toList(),
+    totalLength: json['totalLength'],
+  );
+}
+
+class WallData {
+  final int id;
+  final double height;
+  final double width;
+  final double layerThickness;
+
+  WallData({
+    required this.id,
+    required this.height,
+    required this.width,
+    required this.layerThickness,
+  });
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'height': height,
+    'width': width,
+    'layerThickness': layerThickness,
+  };
+
+  factory WallData.fromJson(Map<String, dynamic> json) => WallData(
+    id: json['id'],
+    height: json['height'],
+    width: json['width'],
+    layerThickness: json['layerThickness'],
+  );
+}
 
 void main() {
   runApp(const KnaufApp());
@@ -76,7 +137,16 @@ class _SplashScreenState extends State<SplashScreen> {
 
 // Экран калькулятора
 class CalcScreen extends StatefulWidget {
-  const CalcScreen({super.key});
+  final double? initialHeight;
+  final double? initialWidth;
+  final double? initialThickness;
+
+  const CalcScreen({
+    super.key,
+    this.initialHeight,
+    this.initialWidth,
+    this.initialThickness,
+  });
 
   @override
   State<CalcScreen> createState() => _CalcScreenState();
@@ -89,10 +159,14 @@ class _CalcScreenState extends State<CalcScreen> {
   
   double _area = 0, _weight = 0, _water = 0, _bags = 0;
 
+  List<RoomPlan> _rooms = [];
+
   @override
   void initState() {
     super.initState();
-    _loadH();
+    _loadRoomsFromStorage();
+    _applyInitialData(); // <-- ДОБАВИТЬ
+    _loadH(); // <-- ПОТОМ ЗАГРУЖАЕМ СОХРАНЁННУЮ ВЫСОТУ (ЕСЛИ НЕТ ДАННЫХ ИЗ КОМНАТЫ)
     _hCtrl.addListener(() {
       _saveH(_hCtrl.text);
       _calc();
@@ -100,10 +174,17 @@ class _CalcScreenState extends State<CalcScreen> {
     _wCtrl.addListener(_calc);
     _tCtrl.addListener(_calc);
   }
-
+  
   void _loadH() async {
     final p = await SharedPreferences.getInstance();
-    _hCtrl.text = p.getString('h') ?? '';
+    final savedHeight = p.getString('h') ?? '';
+    
+    // Если есть переданное значение из комнаты — используем его
+    if (widget.initialHeight != null) {
+      _hCtrl.text = widget.initialHeight!.toString();
+    } else if (savedHeight.isNotEmpty) {
+      _hCtrl.text = savedHeight;
+    }
   }
 
   void _saveH(String v) async {
@@ -135,13 +216,93 @@ class _CalcScreenState extends State<CalcScreen> {
     }
   }
 
+  void _applyInitialData() {
+    final args = widget;
+    if (args.initialHeight != null) {
+      _hCtrl.text = args.initialHeight!.toString();
+    }
+    if (args.initialWidth != null) {
+      _wCtrl.text = args.initialWidth!.toString();
+    }
+    if (args.initialThickness != null) {
+      _tCtrl.text = args.initialThickness!.toString();
+    }
+    _calc();
+  }
+
+    // ============ ВСТАВЬ СЮДА ============
+  void _openRoomPlanner() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => RoomPlanner(
+          onSave: (room) {
+            setState(() {
+              _rooms.add(room);
+            });
+            _saveRoomsToStorage();  // ← СОХРАНЯЕМ В ПАМЯТЬ
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('✅ Сохранено: ${room.name} (${room.walls.length} стен)'),
+                backgroundColor: Colors.green,
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+  // ====================================
+
+  // Функция для сохранения в SharedPreferences или SQLite
+  Future<void> _saveRoomsToStorage() async {
+    final prefs = await SharedPreferences.getInstance();
+    final roomsJson = _rooms.map((room) => room.toJson()).toList();
+    final encoded = jsonEncode(roomsJson);
+    await prefs.setString('rooms', encoded);
+  }
+
+  // Функция для загрузки
+  Future<void> _loadRoomsFromStorage() async {
+    final prefs = await SharedPreferences.getInstance();
+    final String? roomsJson = prefs.getString('rooms');
+    if (roomsJson != null) {
+      try {
+        final List<dynamic> decoded = jsonDecode(roomsJson);
+        setState(() {
+          _rooms = decoded.map((e) => RoomPlan.fromJson(e)).toList();
+        });
+      } catch (e) {
+        print('Ошибка загрузки комнат: $e');
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Калькулятор штукатура', style: TextStyle(fontWeight: FontWeight.bold)),
         centerTitle: true,
-        // actions: убрали полностью
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.folder_open),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => SavedRoomsScreen(rooms: _rooms),
+                ),
+              );
+            },
+            tooltip: 'Сохранённые комнаты',
+          ),
+          IconButton(
+            icon: const Icon(Icons.home_work),
+            onPressed: _openRoomPlanner,
+            tooltip: 'Планировщик комнат',
+          ),
+        ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
