@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_slidable/flutter_slidable.dart';
 import 'room_planner.dart';
 import 'main.dart';
 
@@ -35,7 +36,6 @@ class ThumbnailPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     if (walls.isEmpty) return;
 
-    // Находим границы
     double minX = 0, maxX = 0, minY = 0, maxY = 0;
     for (final wall in walls) {
       minX = [minX, wall.startX, wall.endX].reduce((a, b) => a < b ? a : b);
@@ -64,7 +64,6 @@ class ThumbnailPainter extends CustomPainter {
       canvas.drawLine(start, end, paint);
     }
 
-    // Точки соединения
     final pointPaint = Paint()
       ..color = Colors.grey
       ..style = PaintingStyle.fill;
@@ -78,169 +77,157 @@ class ThumbnailPainter extends CustomPainter {
   bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
 }
 
-class SavedRoomsScreen extends StatelessWidget {
+// ===== ЭКРАН СПИСКА КОМНАТ (Stateful) =====
+class SavedRoomsScreen extends StatefulWidget {
   final List<RoomPlan> rooms;
+  final Function(List<RoomPlan>)? onRoomsChanged;
 
-  const SavedRoomsScreen({super.key, required this.rooms});
+  const SavedRoomsScreen({
+    super.key,
+    required this.rooms,
+    this.onRoomsChanged,
+  });
 
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Сохранённые комнаты'),
-        centerTitle: true,
+  State<SavedRoomsScreen> createState() => _SavedRoomsScreenState();
+}
+
+class _SavedRoomsScreenState extends State<SavedRoomsScreen> {
+  late List<RoomPlan> _localRooms;
+
+  @override
+  void initState() {
+    super.initState();
+    _localRooms = List.from(widget.rooms); // копируем начальный список
+  }
+
+  void _sendWallToCalculator(
+    BuildContext context, {
+    required WallSegment wall,
+    required double roomHeight,
+  }) {
+    Navigator.pop(context);
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => CalcScreen(
+          initialHeight: roomHeight,
+          initialWidth: wall.length,
+          initialThickness: wall.layerThickness.toDouble(),
+        ),
       ),
-      body: rooms.isEmpty
-          ? const Center(
-              child: Text(
-                'Нет сохранённых комнат',
-                style: TextStyle(fontSize: 18, color: Colors.grey),
-              ),
-            )
-          : ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: rooms.length,
-              itemBuilder: (context, index) {
-                final room = rooms[index];
-                return Card(
-                  elevation: 2,
-                  margin: const EdgeInsets.only(bottom: 12),
-                  child: ListTile(
-                    leading: RoomThumbnail(walls: room.walls), // <-- МИНИАТЮРА
-                    title: Text(
-                      room.name,
-                      style: const TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                    subtitle: Text(
-                      'Стен: ${room.walls.length} | Длина: ${room.totalLength.toStringAsFixed(1)} м',
-                    ),
-                    trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-                    onTap: () {
-                      // Показываем детали комнаты
-                      _showRoomDetails(context, room);
-                    },
-                  ),
-                );
-              },
-            ),
     );
   }
 
   void _showRoomDetails(BuildContext context, RoomPlan room) {
     showModalBottomSheet(
-        context: context,
-        isScrollControlled: true,
-        shape: const RoundedRectangleBorder(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-        ),
-        builder: (context) => DraggableScrollableSheet(
+      ),
+      builder: (context) => DraggableScrollableSheet(
         initialChildSize: 0.85,
         maxChildSize: 0.95,
         minChildSize: 0.5,
         expand: false,
         builder: (context, scrollController) => Padding(
-            padding: const EdgeInsets.all(20),
-            child: Column(
+          padding: const EdgeInsets.all(20),
+          child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-                // "Ручка"
-                Center(
+              Center(
                 child: Container(
-                    width: 40,
-                    height: 4,
-                    decoration: BoxDecoration(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
                     color: Colors.grey[300],
                     borderRadius: BorderRadius.circular(2),
-                    ),
+                  ),
                 ),
-                ),
-                const SizedBox(height: 16),
-
-                // === ЗАГОЛОВОК + ЭСКИЗ В РЯД ===
-                Row(
+              ),
+              const SizedBox(height: 16),
+              Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                    // Левая часть: название и характеристики
-                    Expanded(
+                  Expanded(
                     flex: 2,
                     child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
                         Text(
-                            room.name,
-                            style: const TextStyle(
+                          room.name,
+                          style: const TextStyle(
                             fontSize: 24,
                             fontWeight: FontWeight.bold,
-                            ),
+                          ),
                         ),
                         const SizedBox(height: 8),
                         Text(
-                            'Всего стен: ${room.walls.length}',
-                            style: const TextStyle(fontSize: 16, color: Colors.grey),
+                          'Всего стен: ${room.walls.length}',
+                          style: const TextStyle(fontSize: 16, color: Colors.grey),
                         ),
                         Text(
-                            'Общая длина: ${room.totalLength.toStringAsFixed(2)} м',
-                            style: const TextStyle(fontSize: 16, color: Colors.grey),
+                          'Общая длина: ${room.totalLength.toStringAsFixed(2)} м',
+                          style: const TextStyle(fontSize: 16, color: Colors.grey),
                         ),
                         Text(
-                            'Высота: ${room.height.toStringAsFixed(1)} м',
-                            style: const TextStyle(fontSize: 16, color: Colors.grey),
+                          'Высота: ${room.height.toStringAsFixed(1)} м',
+                          style: const TextStyle(fontSize: 16, color: Colors.grey),
                         ),
-                        ],
+                      ],
                     ),
-                    ),
-                    // Правая часть: эскиз комнаты
-                    Expanded(
+                  ),
+                  Expanded(
                     flex: 1,
                     child: Container(
-                        height: 120,
-                        decoration: BoxDecoration(
+                      height: 120,
+                      decoration: BoxDecoration(
                         color: Colors.grey[100],
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(color: Colors.grey[300]!),
-                        ),
-                        child: CustomPaint(
+                      ),
+                      child: CustomPaint(
                         painter: ThumbnailPainter(walls: room.walls),
-                        ),
+                      ),
                     ),
-                    ),
+                  ),
                 ],
-                ),
-                const SizedBox(height: 16),
-                const Divider(),
-                const Text(
+              ),
+              const SizedBox(height: 16),
+              const Divider(),
+              const Text(
                 'Стены:',
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 8),
-                Expanded(
+              ),
+              const SizedBox(height: 8),
+              Expanded(
                 child: ListView.builder(
-                    controller: scrollController,
-                    itemCount: room.walls.length,
-                    itemBuilder: (context, i) {
+                  controller: scrollController,
+                  itemCount: room.walls.length,
+                  itemBuilder: (context, i) {
                     final wall = room.walls[i];
                     return ListTile(
-                        leading: CircleAvatar(
+                      leading: CircleAvatar(
                         backgroundColor: wall.color.withAlpha(200),
                         child: Text(
-                            '${wall.id}',
-                            style: const TextStyle(color: Colors.white),
+                          '${wall.id}',
+                          style: const TextStyle(color: Colors.white),
                         ),
-                        ),
-                        title: Text('Стена №${wall.id}'),
-                        subtitle: Text(
+                      ),
+                      title: Text('Стена №${wall.id}'),
+                      subtitle: Text(
                         'Длина: ${wall.length.toStringAsFixed(2)} м, Слой: ${wall.layerThickness} мм',
-                        ),
-                        trailing: IconButton(
+                      ),
+                      trailing: IconButton(
                         icon: const Icon(Icons.arrow_forward, color: Color(0xFFFF5722)),
                         tooltip: 'Посчитать эту стену',
                         onPressed: () {
-                            Navigator.pop(context); // закрываем окно
-                            _sendWallToCalculator(
+                          _sendWallToCalculator(
                             context,
                             wall: wall,
                             roomHeight: room.height,
-                            );
+                          );
                         },
                       ),
                     );
@@ -253,24 +240,90 @@ class SavedRoomsScreen extends StatelessWidget {
       ),
     );
   }
-    void _sendWallToCalculator(
-        BuildContext context, {
-        required WallSegment wall,
-        required double roomHeight,
-    }) {
-        // Закрываем окно с деталями
-        Navigator.pop(context);
 
-        // Открываем калькулятор с данными стены
-        Navigator.push(
-        context,
-        MaterialPageRoute(
-            builder: (context) => CalcScreen(
-            initialHeight: roomHeight,           // высота
-            initialWidth: wall.length,           // длина → ширина
-            initialThickness: wall.layerThickness.toDouble(), // слой
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Сохранённые комнаты'),
+        centerTitle: true,
+      ),
+      body: _localRooms.isEmpty
+          ? const Center(
+              child: Text(
+                'Нет сохранённых комнат',
+                style: TextStyle(fontSize: 18, color: Colors.grey),
+              ),
+            )
+          : ListView.builder(
+              padding: const EdgeInsets.all(16),
+              itemCount: _localRooms.length,
+              itemBuilder: (context, index) {
+                final room = _localRooms[index];
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: Slidable(
+                    key: Key(room.name + index.toString()),
+                    endActionPane: ActionPane(
+                      motion: const ScrollMotion(),
+                      extentRatio: 0.25,
+                      children: [
+                        SlidableAction(
+                          onPressed: (context) async {
+                            final bool? confirm = await showDialog<bool>(
+                              context: context,
+                              builder: (context) => AlertDialog(
+                                title: const Text('Удалить комнату?'),
+                                content: Text('Вы точно хотите удалить комнату "${room.name}"?'),
+                                actions: [
+                                  TextButton(
+                                    onPressed: () => Navigator.of(context).pop(false),
+                                    child: const Text('Нет'),
+                                  ),
+                                  TextButton(
+                                    onPressed: () => Navigator.of(context).pop(true),
+                                    child: const Text('Да', style: TextStyle(color: Colors.red)),
+                                  ),
+                                ],
+                              ),
+                            );
+
+                            if (confirm == true) {
+                              // 1. Удаляем локально — карточка исчезает сразу
+                              setState(() {
+                                _localRooms.removeAt(index);
+                              });
+                              // 2. Сохраняем изменения в родительском виджете
+                              widget.onRoomsChanged?.call(_localRooms);
+                            }
+                          },
+                          backgroundColor: Colors.red,
+                          foregroundColor: Colors.white,
+                          icon: Icons.delete,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ],
+                    ),
+                    child: Card(
+                      margin: EdgeInsets.zero,
+                      elevation: 2,
+                      child: ListTile(
+                        leading: RoomThumbnail(walls: room.walls),
+                        title: Text(
+                          room.name,
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        subtitle: Text(
+                          'Стен: ${room.walls.length} | Длина: ${room.totalLength.toStringAsFixed(1)} м',
+                        ),
+                        trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                        onTap: () => _showRoomDetails(context, room),
+                      ),
+                    ),
+                  ),
+                );
+              },
             ),
-        ),
-      );
-    }
+    );
+  }
 }

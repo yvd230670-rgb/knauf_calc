@@ -291,7 +291,15 @@ class _CalcScreenState extends State<CalcScreen> {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (context) => SavedRoomsScreen(rooms: _rooms),
+                  builder: (context) => SavedRoomsScreen(
+                    rooms: _rooms,
+                    onRoomsChanged: (updatedRooms) {
+                      setState(() {
+                        _rooms = updatedRooms;
+                      });
+                      _saveRoomsToStorage();
+                    },
+                  ),
                 ),
               );
             },
@@ -411,7 +419,7 @@ class _CalcScreenState extends State<CalcScreen> {
                     const Divider(),
                     ListTile(
                       leading: const Icon(Icons.aspect_ratio, color: Color(0xFFFF5722)),
-                      title: const Text('Площадь стен'),
+                      title: const Text('Площадь стен(ы)'),
                       trailing: Text(
                         '${_area.toStringAsFixed(2)} м²',
                         style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
